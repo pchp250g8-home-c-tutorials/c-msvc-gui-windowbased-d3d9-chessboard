@@ -1,4 +1,4 @@
-// ChessBoard.c : Defines the entry point for the application.
+// ChessBoard.cpp : Defines the entry point for the application.
 //
 
 #include "framework.h"
@@ -17,8 +17,10 @@ IDirect3D9* m_d3d9;
 IDirect3DDevice9* m_d3d_Device;
 
 // Forward declarations of functions included in this code module:
+ATOM                MyRegisterClass(HINSTANCE hInstance);
 BOOL                InitInstance(HINSTANCE, int);
-INT_PTR CALLBACK    HelloDirect3DDlg(HWND, UINT, WPARAM, LPARAM);
+LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
+INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 //------------------------------------------------------------------------------------------------------
 BOOL InitializeDirect3D();
 void DestroyDirect3D();
@@ -29,8 +31,6 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_ LPWSTR    lpCmdLine,
                      _In_ int       nCmdShow)
 {
-
-    
     UNREFERENCED_PARAMETER(hPrevInstance);
     UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -39,12 +39,57 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     // Initialize global strings
     LoadStringW(hInstance, IDS_APP_TITLE, szTitle, MAX_LOADSTRING);
     LoadStringW(hInstance, IDC_CHESSBOARD, szWindowClass, MAX_LOADSTRING);
+    MyRegisterClass(hInstance);
+
     // Perform application initialization:
     if (!InitInstance (hInstance, nCmdShow))
     {
         return FALSE;
     }
-    return 0;
+
+    HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_CHESSBOARD));
+
+    MSG msg;
+
+    // Main message loop:
+    while (GetMessage(&msg, NULL, 0, 0))
+    {
+        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        {
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+    }
+
+    return (int) msg.wParam;
+}
+
+
+
+//
+//  FUNCTION: MyRegisterClass()
+//
+//  PURPOSE: Registers the window class.
+//
+ATOM MyRegisterClass(HINSTANCE hInstance)
+{
+    WNDCLASSEXW wcex;
+
+    wcex.cbSize = sizeof(WNDCLASSEX);
+
+    wcex.style          = CS_HREDRAW | CS_VREDRAW;
+    wcex.lpfnWndProc    = WndProc;
+    wcex.cbClsExtra     = 0;
+    wcex.cbWndExtra     = 0;
+    wcex.hInstance      = hInstance;
+    wcex.hIcon          = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_CHESSBOARD));
+    wcex.hCursor        = LoadCursor(NULL, IDC_ARROW);
+    wcex.hbrBackground  = (HBRUSH)(COLOR_WINDOW+1);
+    wcex.lpszMenuName   = MAKEINTRESOURCEW(IDC_CHESSBOARD);
+    wcex.lpszClassName  = szWindowClass;
+    wcex.hIconSm        = LoadIcon(wcex.hInstance, MAKEINTRESOURCE(IDI_SMALL));
+
+    return RegisterClassExW(&wcex);
 }
 
 //
@@ -60,52 +105,55 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
    hInst = hInstance; // Store instance handle in our global variable
-   INT_PTR nResponse;
-   INITCOMMONCONTROLSEX InitCtrls;
-   hInst = hInstance; // Сохранить маркер экземпляра в глобальной переменной
-   InitCtrls.dwSize = sizeof(InitCtrls);
-   // Выберите этот параметр для включения всех общих классов управления, которые необходимо использовать
-   // в вашем приложении.
-   InitCtrls.dwICC = ICC_WIN95_CLASSES;
-   InitCommonControlsEx(&InitCtrls);
-   nResponse = DialogBox(hInst, MAKEINTRESOURCE(IDD_CHESSBOARD_DIALOG), NULL, HelloDirect3DDlg);
-   if (nResponse == IDOK)
+
+   HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+      CW_USEDEFAULT, 0, CW_USEDEFAULT, 0, NULL, NULL, hInstance, NULL);
+
+   if (!hWnd)
    {
-       // TODO: Введите код для обработки закрытия диалогового окна
-       //  с помощью кнопки "ОК"
+      return FALSE;
    }
-   else if (nResponse == IDCANCEL)
+   m_hWnd = hWnd;
+   if (!InitializeDirect3D())
    {
-       // TODO: Введите код для обработки закрытия диалогового окна
-       //  с помощью кнопки "Отмена"
-   }
-   else if (nResponse == -1)
+       MessageBox(NULL, _T("Error Loading DirectX"), _T("Error"), MB_OK | MB_ICONERROR);
        return FALSE;
+   }
+   ShowWindow(hWnd, nCmdShow);
+   UpdateWindow(hWnd);
+
    return TRUE;
 }
 
-
-
-// Message handler for Dialog Box - main window of the application.
-INT_PTR CALLBACK HelloDirect3DDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+//
+//  FUNCTION: WndProc(HWND, UINT, WPARAM, LPARAM)
+//
+//  PURPOSE: Processes messages for the main window.
+//
+//  WM_COMMAND  - process the application menu
+//  WM_PAINT    - Paint the main window
+//  WM_DESTROY  - post a quit message and return
+//
+//
+LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-    UNREFERENCED_PARAMETER(lParam);
     switch (message)
     {
-    case WM_INITDIALOG:
-        m_hWnd = hDlg;
-        if (!InitializeDirect3D())
-        {
-            MessageBox(NULL, _T("Error Loading DirectX"), _T("Error"), MB_OK | MB_ICONERROR);
-            PostQuitMessage(0);
-            return FALSE;
-        }
-        return (INT_PTR)TRUE;
     case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
         {
-            EndDialog(hDlg, LOWORD(wParam));
-            return (INT_PTR)TRUE;
+            int wmId = LOWORD(wParam);
+            // Parse the menu selections:
+            switch (wmId)
+            {
+            case IDM_ABOUT:
+                DialogBox(hInst, MAKEINTRESOURCE(IDD_ABOUTBOX), hWnd, About);
+                break;
+            case IDM_EXIT:
+                DestroyWindow(hWnd);
+                break;
+            default:
+                return DefWindowProc(hWnd, message, wParam, lParam);
+            }
         }
         break;
     case WM_ACTIVATE:
@@ -116,19 +164,19 @@ INT_PTR CALLBACK HelloDirect3DDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
     case WM_PAINT:
         {
             PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hDlg, &ps);
-            // TODO: Add any drawing code that uses hdc here...
+            BeginPaint(hWnd, &ps);
+            // TODO: Add any drawing code here...
             RenderScene();
-            EndPaint(hDlg, &ps);
-            break;
+            EndPaint(hWnd, &ps);
         }
+        break;
     case WM_SIZE:
         {
             RECT rcPaint;
             int width = 0, height = 0;
             if (m_d3d9 == NULL) return FALSE;
             if (m_d3d_Device == NULL) return FALSE;
-            GetClientRect(hDlg, &rcPaint);
+            GetClientRect(hWnd, &rcPaint);
             width = rcPaint.right - rcPaint.left;
             height = rcPaint.bottom - rcPaint.top;
             if (width > 0 && height > 0)
@@ -137,18 +185,38 @@ INT_PTR CALLBACK HelloDirect3DDlg(HWND hDlg, UINT message, WPARAM wParam, LPARAM
                 d3dpp.BackBufferHeight = height;
                 m_d3d_Device->lpVtbl->Reset(m_d3d_Device, &d3dpp);
             }
-            InvalidateRect(hDlg, NULL, TRUE);
+            InvalidateRect(hWnd, NULL, TRUE);
             break;
         }
     case WM_DESTROY:
-        DestroyDirect3D();
         PostQuitMessage(0);
+        break;
+    default:
+        return DefWindowProc(hWnd, message, wParam, lParam);
+    }
+    return 0;
+}
+
+// Message handler for about box.
+INT_PTR CALLBACK About(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    UNREFERENCED_PARAMETER(lParam);
+    switch (message)
+    {
+    case WM_INITDIALOG:
+        return (INT_PTR)TRUE;
+
+    case WM_COMMAND:
+        if (LOWORD(wParam) == IDOK || LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, LOWORD(wParam));
+            return (INT_PTR)TRUE;
+        }
         break;
     }
     return (INT_PTR)FALSE;
 }
-
-
+//------------------------------------------------------------------------------------------------------
 BOOL InitializeDirect3D()
 {
     D3DDISPLAYMODE d3ddm;
@@ -173,18 +241,18 @@ BOOL InitializeDirect3D()
     d3dpp.SwapEffect = D3DSWAPEFFECT_DISCARD;
     hr = m_d3d9->lpVtbl->CreateDevice
     (
-        m_d3d9, 
-        0, 
-        D3DDEVTYPE_HAL, 
-        m_hWnd, 
-        D3DCREATE_SOFTWARE_VERTEXPROCESSING, 
-        &d3dpp, 
+        m_d3d9,
+        0,
+        D3DDEVTYPE_HAL,
+        m_hWnd,
+        D3DCREATE_SOFTWARE_VERTEXPROCESSING,
+        &d3dpp,
         &m_d3d_Device
     );
     if (FAILED(hr)) return FALSE;
     return TRUE;
 }
-
+//------------------------------------------------------------------------------------------------------
 void DestroyDirect3D()
 {
     if (m_d3d_Device != NULL)
@@ -192,15 +260,15 @@ void DestroyDirect3D()
         m_d3d_Device->lpVtbl->Release(m_d3d_Device);
         m_d3d_Device = NULL;
     }
-        
+
     if (m_d3d9 != NULL)
     {
         m_d3d9->lpVtbl->Release(m_d3d9);
         m_d3d9 = NULL;
     }
-        
-}
 
+}
+//------------------------------------------------------------------------------------------------------
 void RenderScene()
 {
     int width, height;
@@ -216,8 +284,8 @@ void RenderScene()
     m_d3d_Device->lpVtbl->Clear
     (
         m_d3d_Device,
-        0, NULL, 
-        D3DCLEAR_TARGET, 
+        0, NULL,
+        D3DCLEAR_TARGET,
         d3dColor1,
         0, 0
     );
